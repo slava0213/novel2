@@ -1,0 +1,879 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Мастер Кремния</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Unbounded:wght@500;700&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>/* Layout concept: тёмная «мастерская» с фиолетовым неоном бренда. Сцена 16:9 с диалогом внизу, отдельные полноэкранные панели для заказов, сборки и чека. */
+:root{
+  --bg:#0e0a18; --panel:#171226; --panel2:#201836; --line:#392c5c;
+  --fg:#efeaff; --mute:#a99fc8; --accent:#9d6cff; --accent-d:#6f45d6; --warm:#ffb454;
+  --ok:#5fd68a; --bad:#ff6b7a; --warn:#ffd166;
+  --f-disp:'Unbounded','Manrope',system-ui,sans-serif;
+  --f-body:'Manrope',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--f-body);
+  padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px));
+  padding-block:12px;overflow-x:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--warm);outline-offset:2px}
+.hidden{display:none!important}
+
+#app{max-width:1280px;margin:0 auto;position:relative}
+
+/* ===== сцена ===== */
+.stage{position:relative;aspect-ratio:16/9;width:100%;background:#000;border-radius:14px;overflow:hidden;
+  border:1px solid var(--line);user-select:none;-webkit-user-select:none}
+.bg{position:absolute;inset:0;background-size:cover;background-position:center;transition:opacity .6s ease}
+.bg.off{opacity:0}
+.vignette{position:absolute;inset:0;background:linear-gradient(to top,rgba(8,5,16,.75) 0,rgba(8,5,16,0) 45%,rgba(8,5,16,.25) 100%);pointer-events:none}
+.sprites{position:absolute;inset:0;pointer-events:none}
+.spr{position:absolute;bottom:0;transform:translateX(-50%);transition:filter .25s,opacity .3s;filter:drop-shadow(0 6px 14px rgba(0,0,0,.55))}
+.spr.dim{filter:brightness(.55) drop-shadow(0 6px 14px rgba(0,0,0,.55))}
+.spr.pop{animation:pop .22s ease-out}
+@keyframes pop{from{transform:translateX(-50%) translateY(10px);opacity:.4}to{transform:translateX(-50%);opacity:1}}
+.spr.in{animation:sprin .35s ease-out}
+@keyframes sprin{from{opacity:0;transform:translateX(-50%) translateY(14px)}to{opacity:1;transform:translateX(-50%)}}
+
+.topbar{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;z-index:5}
+.chip{display:inline-flex;align-items:center;gap:8px;background:rgba(14,10,24,.72);border:1px solid var(--line);color:var(--fg);
+  padding:6px 12px;border-radius:999px;font-size:13px;backdrop-filter:blur(6px)}
+button.chip:hover{border-color:var(--accent)}
+.brand-mini{font-family:var(--f-disp);font-size:12px;letter-spacing:.04em}
+.brand-mini svg{width:18px;height:18px}
+
+.dialog{position:absolute;left:3%;right:3%;bottom:3.5%;z-index:4;background:rgba(18,12,32,.88);border:1px solid var(--line);
+  border-radius:14px;padding:16px 20px 18px;min-height:112px;backdrop-filter:blur(8px);cursor:pointer}
+.dialog .who{position:absolute;top:-15px;left:18px;font-family:var(--f-disp);font-size:13px;padding:4px 14px;border-radius:999px;
+  background:var(--panel2);border:1px solid var(--line)}
+.dialog .txt{font-size:clamp(15px,1.9vw,19px);line-height:1.55;min-height:3.1em}
+.dialog .txt.narr{font-style:italic;color:#d9d0f5}
+.dialog .next{position:absolute;right:16px;bottom:8px;color:var(--accent);font-size:12px;animation:blink 1.1s infinite}
+@keyframes blink{50%{opacity:.25}}
+
+.choices{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px;
+  padding:5%;background:rgba(8,5,16,.55)}
+.choices .prompt{font-family:var(--f-disp);font-size:clamp(13px,1.7vw,17px);text-align:center;max-width:760px;margin-bottom:4px}
+.choice{background:rgba(32,24,54,.95);border:1px solid var(--accent-d);border-radius:12px;padding:12px 18px;width:min(640px,100%);text-align:left;
+  font-size:clamp(14px,1.6vw,17px);transition:transform .12s,border-color .12s}
+.choice:hover{transform:translateX(4px);border-color:var(--accent)}
+
+/* ===== экраны ===== */
+.screen{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:clamp(14px,2.4vw,28px)}
+.title-screen{position:relative;aspect-ratio:16/9;overflow:hidden;display:flex;align-items:center;justify-content:center;text-align:center;
+  border-radius:14px;border:1px solid var(--line);min-height:420px}
+.title-screen .bg{opacity:1}
+.title-screen .ov{position:absolute;inset:0;background:radial-gradient(circle at 50% 45%,rgba(14,10,24,.72),rgba(14,10,24,.92))}
+.title-screen .box{position:relative;z-index:2;padding:24px;max-width:720px}
+.logo{width:76px;height:76px;margin:0 auto 14px;display:block}
+.title-screen h1{font-family:var(--f-disp);font-size:clamp(28px,5vw,54px);margin:0 0 8px;letter-spacing:.01em;text-wrap:balance}
+.title-screen p{color:var(--mute);margin:0 auto 22px;max-width:520px;text-wrap:balance}
+.btn{background:var(--accent);color:#13091f;border:0;padding:12px 26px;border-radius:12px;font-weight:800;font-size:15px;transition:transform .12s,background .12s}
+.btn:hover{background:#b48cff;transform:translateY(-1px)}
+.btn:disabled{background:#3a3158;color:#85799f;cursor:not-allowed;transform:none}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.btn.ghost:hover{border-color:var(--accent);background:rgba(157,108,255,.1)}
+.fine{font-size:12px;color:var(--mute)}
+
+h2.h{font-family:var(--f-disp);font-size:clamp(18px,2.6vw,26px);margin:0 0 4px;text-wrap:balance}
+.sub{color:var(--mute);margin:0 0 18px}
+
+/* ===== заказы ===== */
+.orders{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.order{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.order.done{border-color:#3d7a57}
+.o-head{display:flex;gap:12px;align-items:center}
+.face{width:64px;height:64px;border-radius:50%;background:#2b2147;object-fit:cover;object-position:top;border:2px solid var(--accent-d);flex:none}
+.o-name{font-weight:800}
+.o-role{color:var(--mute);font-size:13px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--mute)}
+.tag.t-b{color:#8fd0ff;border-color:#2f5e80}.tag.t-m{color:#ffd166;border-color:#7a6320}.tag.t-h{color:#ff9bb0;border-color:#7a3347}
+.stars{color:var(--warm);letter-spacing:2px;font-size:15px}
+.order p{margin:0;color:#d5ccee;font-size:14px;flex:1}
+.o-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ===== сборка ===== */
+.b-top{display:flex;gap:14px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.b-top .brief{flex:1;min-width:240px}
+.b-top .brief p{margin:2px 0 0;color:#d5ccee}
+.b-layout{display:grid;grid-template-columns:220px minmax(0,1fr) 300px;gap:14px;align-items:start}
+.steps{display:flex;flex-direction:column;gap:6px}
+.step{text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;min-width:0}
+.step.cur{border-color:var(--accent);background:#2a1f4a}
+.step .s-t{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.07em}
+.step .s-v{font-size:13px;margin-top:2px;overflow-wrap:anywhere}
+.step .s-v.empty{color:#7c7197}
+.step .s-p{font-size:12px;color:var(--warm);font-variant-numeric:tabular-nums}
+.opts-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.opts-head h3{margin:0;font-family:var(--f-disp);font-size:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.card{position:relative;text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;
+  min-width:0;transition:border-color .12s,transform .12s}
+.card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.card.sel{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok) inset}
+.card .c-n{font-weight:700;line-height:1.3;overflow-wrap:anywhere}
+.card .c-s{font-size:12.5px;color:#c3b9e0;font-family:var(--f-mono);line-height:1.45}
+.card .c-note{font-size:12.5px;color:var(--mute)}
+.card .c-p{margin-top:auto;font-weight:800;color:var(--warm);font-variant-numeric:tabular-nums}
+.badge{position:absolute;top:8px;right:8px;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px}
+.badge.ok{background:rgba(95,214,138,.15);color:var(--ok);border:1px solid #2f7a4d}
+.badge.bad{background:rgba(255,107,122,.15);color:var(--bad);border:1px solid #8a3340}
+.sum{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;position:sticky;top:12px}
+.sum h4{margin:0;font-family:var(--f-disp);font-size:13px;letter-spacing:.03em}
+.needs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;font-size:13px}
+.needs li{display:flex;gap:8px;align-items:flex-start}
+.needs .mk{flex:none;width:16px;text-align:center;font-weight:800}
+.needs .y{color:var(--ok)}.needs .n{color:#7c7197}
+.bar{height:10px;background:#2b2147;border-radius:999px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok);transition:width .3s,background .3s}
+.bar.over i{background:var(--bad)}
+.tot{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums;font-weight:800}
+.katya{display:flex;gap:10px;align-items:flex-start;background:#1a1330;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px}
+.katya img{width:42px;height:42px;border-radius:50%;object-fit:cover;object-position:top;flex:none;border:2px solid var(--accent-d);background:#2b2147}
+.katya.bad{border-color:#8a3340;background:#2a1220}
+.katya p{margin:0}
+
+/* ===== чек ===== */
+.receipt{background:#f3eefc;color:#1b1330;border-radius:6px;padding:clamp(16px,3vw,32px);font-family:var(--f-mono);font-size:13px;max-width:860px;margin:0 auto;
+  box-shadow:0 20px 50px rgba(0,0,0,.45)}
+.receipt h3{font-family:var(--f-disp);text-align:center;margin:0;font-size:clamp(15px,2.2vw,20px);letter-spacing:.04em}
+.receipt .r-sub{text-align:center;margin:4px 0 14px;color:#5b4d85}
+.receipt hr{border:0;border-top:2px dashed #9a88c9;margin:14px 0}
+.r-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 14px;padding:8px 0;border-bottom:1px dotted #c3b6e4}
+.r-row .nm{font-weight:700;overflow-wrap:anywhere}
+.r-row .cat{font-size:11px;text-transform:uppercase;color:#6f5fa0;letter-spacing:.07em}
+.r-row .sp{grid-column:1;color:#4a3d72;font-size:12px}
+.r-row .pr{grid-row:1/3;grid-column:2;align-self:center;font-weight:800;white-space:nowrap}
+.r-row .lk{grid-column:1/3;font-size:12px;display:flex;gap:14px;flex-wrap:wrap}
+.r-row .lk a{color:#5a2fd0}
+.r-total{display:flex;justify-content:space-between;font-weight:800;font-size:15px;padding:6px 0}
+.r-chk{list-style:none;margin:6px 0;padding:0;display:flex;flex-direction:column;gap:4px}
+.r-chk .ok{color:#14753d}.r-chk .bd{color:#b3202f}.r-chk .nt{color:#8a6a00}
+.r-foot{font-size:11.5px;color:#5b4d85;margin-top:10px}
+.r-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:16px}
+.verdict{display:flex;gap:14px;align-items:center;max-width:860px;margin:0 auto 16px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px}
+.verdict img{width:64px;height:64px;border-radius:50%;object-fit:cover;object-position:top;border:2px solid var(--accent-d);flex:none}
+.verdict .v-t{font-family:var(--f-disp);font-size:14px;margin-bottom:2px}
+.final-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:14px 0}
+.fin{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px}
+
+@media (max-width:980px){
+  .b-layout{grid-template-columns:minmax(0,1fr)}
+  .steps{flex-direction:row;overflow-x:auto;padding-bottom:4px}
+  .step{min-width:150px;flex:none}
+  .sum{position:static}
+}
+@media (max-width:640px){
+  .stage{aspect-ratio:4/5}
+  .bg{background-position:center}
+  .dialog{left:2%;right:2%;bottom:2%;padding:14px 14px 16px;min-height:104px}
+  .title-screen{aspect-ratio:auto;min-height:520px}
+  .chip{padding:5px 10px;font-size:12px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<div id="app">
+  <div id="titleScr" class="title-screen hidden">
+    <div class="bg" style="background-image:url(img/bg/street.jpg)"></div><div class="ov"></div>
+    <div class="box">
+      <svg viewBox="0 0 64 64" class="logo" aria-hidden="true"><g fill="none" stroke="#9d6cff" stroke-width="4" stroke-linecap="round"><rect x="16" y="16" width="32" height="32" rx="5"/><rect x="26" y="26" width="12" height="12" rx="2"/><path d="M24 6v6M32 6v6M40 6v6M24 52v6M32 52v6M40 52v6M6 24h6M6 32h6M6 40h6M52 24h6M52 32h6M52 40h6"/></g></svg>
+      <h1>Мастер Кремния</h1>
+      <p>Визуальная новелла про сборку ПК и ноутбуков. Выбирай настоящие комплектующие из DNS и Ситилинка, проверяй совместимость и сдавай заказы клиентам.</p>
+      <button class="btn" id="startBtn">Начать смену</button>
+      <p class="fine" style="margin-top:14px">Цены в игре ориентировочные. Перед реальной покупкой сверяйте их на сайтах магазинов.</p>
+    </div>
+  </div>
+
+  <div id="stageWrap" class="hidden">
+    <div class="stage" id="stage">
+      <div class="bg" id="bgA"></div><div class="bg off" id="bgB"></div><div class="vignette"></div>
+      <div class="sprites" id="sprites"></div>
+      <div class="topbar"><span class="chip brand-mini">Кремний и ток</span><button class="chip" id="ordersBtn">Доска заказов</button></div>
+      <div class="choices hidden" id="choices"></div>
+      <div class="dialog" id="dialog" role="button" tabindex="0" aria-label="Далее"><div class="who hidden" id="who"></div><div class="txt" id="txt"></div><div class="next hidden" id="next">Далее ▸</div></div>
+    </div>
+  </div>
+
+  <section id="hubScr" class="screen hidden">
+    <h2 class="h">Доска заказов</h2><p class="sub">Выбери клиента. Заказы можно брать в любом порядке, а сданные пересобирать.</p>
+    <div class="orders" id="orders"></div>
+    <div class="r-actions" style="justify-content:space-between;align-items:center"><span class="fine" id="endHint"></span><span style="display:flex;gap:8px"><button class="btn ghost" id="hubStory">Вернуться в историю</button><button class="btn" id="endShift">Закончить смену</button></span></div>
+  </section>
+  <section id="buildScr" class="screen hidden"></section>
+  <section id="receiptScr" class="screen hidden"></section>
+  <section id="finaleScr" class="screen hidden"></section>
+</div>
+<script>
+const MAN = {"alisa_01": [167, 496], "alisa_02": [154, 495], "alisa_03": [167, 492], "alisa_04": [151, 491], "alisa_05": [150, 494], "alisa_06": [141, 492], "alisa_07": [161, 490], "alisa_08": [173, 499], "artem1_01": [176, 503], "artem1_02": [177, 504], "artem1_03": [193, 504], "artem1_04": [177, 502], "artem1_05": [172, 499], "artem1_06": [187, 502], "artem1_07": [170, 500], "artem1_08": [184, 503], "artem2_01": [164, 504], "artem2_02": [164, 504], "artem2_03": [234, 506], "artem2_04": [183, 505], "artem2_05": [167, 506], "artem2_06": [173, 507], "artem2_07": [173, 504], "artem2_08": [197, 503], "dmitry_01": [202, 487], "dmitry_02": [173, 487], "dmitry_03": [198, 500], "dmitry_04": [216, 488], "dmitry_05": [228, 274], "dmitry_06": [191, 257], "dmitry_07": [216, 324], "dmitry_08": [218, 275], "katya_01": [197, 507], "katya_02": [182, 503], "katya_03": [185, 509], "katya_04": [177, 495], "katya_05": [167, 496], "katya_06": [164, 493], "katya_07": [177, 487], "katya_08": [169, 488], "marina_01": [145, 490], "marina_02": [159, 488], "marina_03": [171, 486], "marina_04": [148, 487], "marina_05": [139, 483], "marina_06": [138, 486], "marina_07": [154, 487], "marina_08": [137, 489], "nikita_01": [138, 474], "nikita_02": [121, 474], "nikita_03": [144, 474], "nikita_04": [155, 474], "nikita_05": [143, 474], "nikita_06": [134, 474], "nikita_07": [149, 473], "nikita_08": [148, 473], "viktor_01": [158, 456], "viktor_02": [160, 460], "viktor_03": [151, 455], "viktor_04": [176, 449], "viktor_05": [161, 456], "viktor_06": [156, 458], "viktor_07": [161, 452], "viktor_08": [170, 321]};
+// ===== КАТАЛОГ КОМПЛЕКТУЮЩИХ =====
+// Цены ориентировочные (₽), по данным из ТЗ. Перед покупкой сверяйте на dns-shop.ru и citilink.ru.
+const CPU = [
+  {id:'i5-12400f', name:'Intel Core i5-12400F OEM', q:'Intel Core i5-12400F', price:12000, socket:'LGA1700', cores:6, threads:12, ghz:'до 4.4 ГГц', maxW:117, cool:117, note:'6 ядер, без встроенной графики'},
+  {id:'r5-5600', name:'AMD Ryzen 5 5600 OEM', q:'AMD Ryzen 5 5600', price:11000, socket:'AM4', cores:6, threads:12, ghz:'до 4.4 ГГц', maxW:76, cool:76, note:'6 ядер, платформа AM4', legacy:true},
+  {id:'r5-7500f', name:'AMD Ryzen 5 7500F OEM', q:'AMD Ryzen 5 7500F', price:17000, socket:'AM5', cores:6, threads:12, ghz:'до 5.0 ГГц', maxW:88, cool:88, note:'6 ядер, холодный, платформа AM5'},
+  {id:'r5-9600x', name:'AMD Ryzen 5 9600X OEM', q:'AMD Ryzen 5 9600X', price:22500, socket:'AM5', cores:6, threads:12, ghz:'до 5.4 ГГц', maxW:88, cool:88, note:'Zen 5, 6 ядер'},
+  {id:'i5-13600kf', name:'Intel Core i5-13600KF OEM', q:'Intel Core i5-13600KF', price:27500, socket:'LGA1700', cores:14, threads:20, ghz:'до 5.1 ГГц', maxW:181, cool:181, note:'14 ядер (6P+8E), горячий', kseries:true},
+  {id:'u5-245kf', name:'Intel Core Ultra 5 245KF OEM', q:'Intel Core Ultra 5 245KF', price:29000, socket:'LGA1851', cores:14, threads:14, ghz:'до 5.2 ГГц', maxW:159, cool:159, note:'Новая платформа LGA 1851'},
+  {id:'i7-14700kf', name:'Intel Core i7-14700KF OEM', q:'Intel Core i7-14700KF', price:38000, socket:'LGA1700', cores:20, threads:28, ghz:'до 5.6 ГГц', maxW:253, cool:253, note:'20 ядер, очень горячий', kseries:true},
+  {id:'r7-7800x3d', name:'AMD Ryzen 7 7800X3D OEM', q:'AMD Ryzen 7 7800X3D', price:45000, socket:'AM5', cores:8, threads:16, ghz:'до 5.0 ГГц', maxW:162, cool:120, note:'8 ядер, 3D V-Cache — игровой топ'},
+  {id:'r7-9800x3d', name:'AMD Ryzen 7 9800X3D OEM', q:'AMD Ryzen 7 9800X3D', price:52000, socket:'AM5', cores:8, threads:16, ghz:'до 5.2 ГГц', maxW:162, cool:120, note:'8 ядер, новый 3D V-Cache'},
+  {id:'i9-14900k', name:'Intel Core i9-14900K OEM', q:'Intel Core i9-14900K', price:48000, socket:'LGA1700', cores:24, threads:32, ghz:'до 6.0 ГГц', maxW:253, cool:253, note:'24 ядра, 253 Вт под нагрузкой', kseries:true},
+  {id:'r9-9950x3d', name:'AMD Ryzen 9 9950X3D OEM', q:'AMD Ryzen 9 9950X3D', price:78000, socket:'AM5', cores:16, threads:32, ghz:'до 5.7 ГГц', maxW:230, cool:170, note:'16 ядер для рендера и стрима'},
+];
+
+const MB = [
+  {id:'h610m-e', name:'MSI PRO H610M-E DDR4', q:'MSI PRO H610M-E DDR4', price:6500, socket:'LGA1700', ram:'DDR4', ff:'mATX', note:'Бюджетная, слабое питание процессора', weak:true},
+  {id:'b760m-pg', name:'ASRock B760M PG Lightning/D4', q:'ASRock B760M PG Lightning D4', price:8500, socket:'LGA1700', ram:'DDR4', ff:'mATX', note:'B760, DDR4, mATX'},
+  {id:'b550m-vdh', name:'MSI B550M PRO-VDH', q:'MSI B550M PRO-VDH', price:9000, socket:'AM4', ram:'DDR4', ff:'mATX', note:'B550, DDR4, mATX'},
+  {id:'b650m-hdv', name:'ASRock B650M-HDV/M.2', q:'ASRock B650M-HDV/M.2', price:10500, socket:'AM5', ram:'DDR5', ff:'mATX', note:'Недорогая AM5, DDR5'},
+  {id:'b760m-gx', name:'GIGABYTE B760M GAMING X DDR4', q:'GIGABYTE B760M GAMING X DDR4', price:12000, socket:'LGA1700', ram:'DDR4', ff:'mATX', note:'B760, крепкое питание, DDR4'},
+  {id:'b760m-mortar', name:'MSI MAG B760M MORTAR WIFI DDR5', q:'MSI MAG B760M MORTAR WIFI', price:15500, socket:'LGA1700', ram:'DDR5', ff:'mATX', note:'LGA1700 с памятью DDR5'},
+  {id:'b850m-rs', name:'ASRock B850M PRO RS', q:'ASRock B850M PRO RS', price:16500, socket:'AM5', ram:'DDR5', ff:'mATX', note:'B850, DDR5, PCIe 5.0 M.2'},
+  {id:'b850m-tuf', name:'ASUS TUF GAMING B850M-E WIFI', q:'ASUS TUF GAMING B850M-E WIFI', price:19500, socket:'AM5', ram:'DDR5', ff:'mATX', note:'B850, Wi-Fi, мощное питание'},
+  {id:'b860m-rs', name:'ASRock B860M Pro RS', q:'ASRock B860M Pro RS', price:20000, socket:'LGA1851', ram:'DDR5', ff:'mATX', note:'LGA 1851, DDR5'},
+  {id:'z790-a', name:'ASUS PRIME Z790-P WIFI (ATX)', q:'ASUS PRIME Z790-P WIFI', price:24000, socket:'LGA1700', ram:'DDR5', ff:'ATX', note:'Z790, DDR5, полноразмерная ATX'},
+  {id:'b850-rog', name:'ASUS ROG STRIX B850-A GAMING WIFI (ATX)', q:'ASUS ROG STRIX B850-A GAMING WIFI', price:27000, socket:'AM5', ram:'DDR5', ff:'ATX', note:'B850, DDR5, ATX, премиум-питание'},
+];
+
+const RAM = [
+  {id:'d4-16', name:'Kingston FURY Beast 16 ГБ (2×8) DDR4-3200', q:'Kingston FURY Beast DDR4 16GB 3200', price:4500, type:'DDR4', gb:16, note:'DDR4, 2 планки'},
+  {id:'d4-32', name:'G.Skill Aegis 32 ГБ (2×16) DDR4-3200', q:'G.Skill Aegis DDR4 32GB 3200', price:8000, type:'DDR4', gb:32, note:'DDR4, 2 планки'},
+  {id:'d5-16', name:'Kingston FURY Beast 16 ГБ (2×8) DDR5-5600', q:'Kingston FURY Beast DDR5 16GB 5600', price:8500, type:'DDR5', gb:16, note:'DDR5, 2 планки'},
+  {id:'d5-32', name:'ADATA XPG Lancer Blade 32 ГБ (2×16) DDR5-6000 CL30', q:'ADATA XPG Lancer Blade DDR5 32GB 6000', price:12500, type:'DDR5', gb:32, note:'DDR5-6000, CL30'},
+  {id:'d5-64', name:'ADATA XPG Lancer Blade 64 ГБ (2×32) DDR5-6400 CL32', q:'ADATA XPG Lancer Blade DDR5 64GB 6400', price:26000, type:'DDR5', gb:64, note:'DDR5-6400, для тяжёлых проектов'},
+];
+
+const GPU = [
+  {id:'gtx1650', name:'GeForce GTX 1650 4 ГБ (б/у, со склада)', q:'GeForce GTX 1650 4GB', price:9000, w:75, len:200, rec:300, tier:1, vram:4, note:'Б/у, гарантия сервиса 3 мес.'},
+  {id:'b580', name:'Intel Arc B580 12 ГБ', q:'Intel Arc B580 12GB', price:31000, w:190, len:272, rec:600, tier:2, vram:12, note:'12 ГБ памяти, недорогая'},
+  {id:'rtx5060', name:'Inno3D GeForce RTX 5060 8 ГБ', q:'Inno3D GeForce RTX 5060 8GB', price:47000, w:145, len:245, rec:550, tier:2, vram:8, note:'1080p на высоких, DLSS'},
+  {id:'rx9060xt', name:'PowerColor Radeon RX 9060 XT Reaper 8 ГБ', q:'PowerColor Radeon RX 9060 XT 8GB', price:44500, w:150, len:240, rec:550, tier:2, vram:8, note:'1080p на высоких'},
+  {id:'rtx5070', name:'MSI GeForce RTX 5070 12 ГБ', q:'MSI GeForce RTX 5070 12GB', price:83000, w:250, len:300, rec:650, tier:4, vram:12, note:'Уверенный 1440p'},
+  {id:'rx9070gre', name:'ASRock Radeon RX 9070 GRE Steel Legend OC 12 ГБ', q:'ASRock Radeon RX 9070 GRE 12GB', price:75000, w:220, len:305, rec:650, tier:4, vram:12, note:'1440p, выгодная'},
+  {id:'rtx5070ti', name:'KFA2 GeForce RTX 5070 Ti 16 ГБ', q:'KFA2 GeForce RTX 5070 Ti 16GB', price:120000, w:300, len:320, rec:750, tier:5, vram:16, note:'1440p ультра, 4K'},
+  {id:'rx9070xt', name:'PowerColor Radeon RX 9070 XT Hellhound 16 ГБ', q:'PowerColor Radeon RX 9070 XT 16GB', price:90000, w:304, len:320, rec:750, tier:5, vram:16, note:'1440p ультра, 4K'},
+  {id:'rtx5080', name:'MSI GeForce RTX 5080 16 ГБ', q:'MSI GeForce RTX 5080 16GB', price:165000, w:360, len:340, rec:850, tier:6, vram:16, note:'4K, флагман'},
+  {id:'rtx5090', name:'ASUS GeForce RTX 5090 32 ГБ', q:'ASUS GeForce RTX 5090 32GB', price:360000, w:575, len:358, rec:1000, tier:7, vram:32, atx3:true, note:'Абсолютный топ, 32 ГБ'},
+];
+
+const COOLER = [
+  {id:'ag200', name:'DEEPCOOL AG200 (низкопрофильный)', q:'DEEPCOOL AG200', price:1000, type:'air', tdp:100, h:100, note:'Тонкий башенный, до 100 Вт'},
+  {id:'se224', name:'ID-COOLING SE-224-XTS ARGB', q:'ID-COOLING SE-224-XTS ARGB', price:2300, type:'air', tdp:220, h:154, note:'Башня, до 220 Вт'},
+  {id:'ak400', name:'DEEPCOOL AK400', q:'DEEPCOOL AK400', price:2700, type:'air', tdp:220, h:155, note:'Башня, до 220 Вт'},
+  {id:'pa120', name:'Thermalright Peerless Assassin 120 SE', q:'Thermalright Peerless Assassin 120 SE', price:3500, type:'air', tdp:245, h:155, note:'Двойная башня, до 245 Вт'},
+  {id:'rt620', name:'PCCooler RT620', q:'PCCooler RT620', price:4500, type:'air', tdp:260, h:158, note:'Двойная башня, до 260 Вт'},
+  {id:'darkrock', name:'be quiet! Dark Rock Pro 5', q:'be quiet Dark Rock Pro 5', price:12500, type:'air', tdp:270, h:168, note:'Огромная башня, тишина, до 270 Вт'},
+  {id:'fx360', name:'ID-COOLING FX360 INF (СЖО 360 мм)', q:'ID-COOLING FX360 INF', price:9000, type:'aio', tdp:300, rad:360, note:'СЖО 360 мм, до 300 Вт'},
+];
+
+const SSD = [
+  {id:'nv3-500', name:'Kingston NV3 500 ГБ M.2 NVMe', q:'Kingston NV3 500GB', price:4500, gb:500, note:'PCIe 4.0'},
+  {id:'nv3-1', name:'Kingston NV3 1 ТБ M.2 NVMe', q:'Kingston NV3 1TB', price:7500, gb:1000, note:'PCIe 4.0'},
+  {id:'legend960', name:'ADATA LEGEND 960 MAX 1 ТБ M.2 NVMe (с радиатором)', q:'ADATA LEGEND 960 MAX 1TB', price:9500, gb:1000, note:'PCIe 4.0, до 7400 МБ/с'},
+  {id:'m480', name:'MSI SPATIUM M480 PRO 2 ТБ M.2 NVMe', q:'MSI SPATIUM M480 PRO 2TB', price:16000, gb:2000, note:'PCIe 4.0, до 7400 МБ/с'},
+  {id:'990pro', name:'Samsung 990 PRO 2 ТБ M.2 NVMe', q:'Samsung 990 PRO 2TB', price:17500, gb:2000, note:'PCIe 4.0, до 7450 МБ/с'},
+];
+
+const PSU = [
+  {id:'vx450', name:'Aerocool VX PLUS 450W', q:'Aerocool VX PLUS 450W', price:2800, w:450, cert:'—', note:'450 Вт, без сертификата'},
+  {id:'pylon550', name:'ADATA XPG PYLON 550W Bronze', q:'ADATA XPG PYLON 550W', price:4800, w:550, cert:'80+ Bronze', note:'550 Вт'},
+  {id:'vte650', name:'Cougar VTE 650W Bronze', q:'Cougar VTE 650W', price:5500, w:650, cert:'80+ Bronze', note:'650 Вт'},
+  {id:'pm750', name:'DEEPCOOL PM750D 750W Gold', q:'DEEPCOOL PM750D', price:8500, w:750, cert:'80+ Gold', note:'750 Вт, Gold'},
+  {id:'pq850', name:'DEEPCOOL GamerStorm PQ850G 850W Gold', q:'DEEPCOOL PQ850G', price:12000, w:850, cert:'80+ Gold', note:'850 Вт, модульный'},
+  {id:'px850', name:'DEEPCOOL PX850G 850W Gold ATX 3.0', q:'DEEPCOOL PX850G', price:13500, w:850, cert:'80+ Gold', atx3:true, note:'850 Вт, ATX 3.0, 12V-2x6'},
+  {id:'tt1000', name:'Thermaltake Toughpower GF A3 1000W Gold ATX 3.1', q:'Thermaltake Toughpower GF A3 1000W', price:17500, w:1000, cert:'80+ Gold', atx3:true, note:'1000 Вт, ATX 3.1, 12V-2x6'},
+];
+
+const CASE = [
+  {id:'compact', name:'Formula компактный mATX', q:'Formula корпус mATX', price:2500, ff:'mATX', gpu:250, cooler:140, rad:0, note:'Компактный, мало места'},
+  {id:'ginzzu', name:'Ginzzu V300 mATX (3 вентилятора ARGB)', q:'Ginzzu V300 корпус', price:3800, ff:'mATX', gpu:280, cooler:150, rad:240, note:'mATX, сетка, 3 вентилятора'},
+  {id:'matrexx', name:'DEEPCOOL MATREXX 40 3FS mATX', q:'DEEPCOOL MATREXX 40 3FS', price:4300, ff:'mATX', gpu:330, cooler:168, rad:240, note:'mATX, 3 вентилятора'},
+  {id:'athena', name:'GAMDIAS ATHENA M4M WOOD mATX', q:'GAMDIAS ATHENA M4M', price:6990, ff:'mATX', gpu:340, cooler:160, rad:240, note:'mATX, сетка, 3×120 ARGB'},
+  {id:'air1000', name:'Montech AIR 1000 Premium (ATX)', q:'Montech AIR 1000 Premium', price:7500, ff:'ATX', gpu:400, cooler:165, rad:360, note:'ATX, сетка, СЖО до 360 мм'},
+  {id:'lancool216', name:'Lian Li LANCOOL 216 (ATX)', q:'Lian Li LANCOOL 216', price:11500, ff:'ATX', gpu:392, cooler:180, rad:360, note:'ATX, мощный обдув, СЖО до 360 мм'},
+];
+
+// ===== НОУТБУКИ =====
+const LAPTOPS = [
+  {id:'honor', name:'HONOR MagicBook X16 (Ryzen 5, 16 ГБ, 512 ГБ)', q:'HONOR MagicBook X16', price:55000, ram:16, ssd:512, kg:1.8, gpu:'встроенная Radeon', ramSoldered:true, note:'16″ IPS, лёгкий, ОЗУ распаяна'},
+  {id:'zenbook', name:'ASUS Zenbook 14 OLED (Core Ultra 7, 16 ГБ, 1 ТБ)', q:'ASUS Zenbook 14 OLED', price:105000, ram:16, ssd:1000, kg:1.2, gpu:'встроенная Intel Arc', ramSoldered:true, note:'14″ OLED, 1.2 кг, ОЗУ распаяна'},
+  {id:'loq', name:'Lenovo LOQ 15 (Core i5, RTX 5050, 16 ГБ, 512 ГБ)', q:'Lenovo LOQ 15 RTX 5050', price:105000, ram:16, ssd:512, kg:2.4, gpu:'RTX 5050 8 ГБ', ramSoldered:false, note:'15.6″ 165 Гц, игровой'},
+  {id:'tuf', name:'ASUS TUF Gaming F16 (Core i5, RTX 5060, 16 ГБ, 512 ГБ)', q:'ASUS TUF Gaming F16 RTX 5060', price:125000, ram:16, ssd:512, kg:2.3, gpu:'RTX 5060 8 ГБ', ramSoldered:false, note:'16″ 165 Гц, игровой'},
+  {id:'vector', name:'MSI Vector 16 HX (Core Ultra 9, RTX 5070 Ti, 32 ГБ, 1 ТБ)', q:'MSI Vector 16 HX RTX 5070 Ti', price:240000, ram:32, ssd:1000, kg:2.5, gpu:'RTX 5070 Ti 12 ГБ', ramSoldered:false, note:'16″ QHD+ 240 Гц'},
+  {id:'rog', name:'ASUS ROG Strix G16 (Core Ultra 9, RTX 5080, 32 ГБ, 1 ТБ)', q:'ASUS ROG Strix G16 RTX 5080', price:280000, ram:32, ssd:1000, kg:2.5, gpu:'RTX 5080 16 ГБ', ramSoldered:false, note:'16″ QHD+ 240 Гц, флагман'},
+];
+const LAP_RAM = [
+  {id:'keep', name:'Оставить ОЗУ как есть', price:0, mult:1, note:'Без апгрейда'},
+  {id:'up32', name:'Апгрейд до 32 ГБ (SO-DIMM DDR5 2×16)', q:'SO-DIMM DDR5 32GB 2x16', price:9500, upTo:32, note:'Нужны съёмные слоты'},
+];
+const LAP_SSD = [
+  {id:'keep', name:'Оставить SSD как есть', price:0, note:'Без апгрейда'},
+  {id:'up1', name:'Заменить на SSD 1 ТБ NVMe', q:'SSD M.2 NVMe 1TB', price:6500, upTo:1000, note:'Установка в сервисе'},
+  {id:'up2', name:'Заменить на SSD 2 ТБ NVMe', q:'SSD M.2 NVMe 2TB', price:12500, upTo:2000, note:'Установка в сервисе'},
+];
+const LAP_ACC = [
+  {id:'bag', name:'Городской рюкзак для 16″', q:'рюкзак для ноутбука 16', price:4500, note:'Влезает 16″ и зарядка'},
+  {id:'mouse', name:'Мышь Logitech MX Anywhere 3S', q:'Logitech MX Anywhere 3S', price:7000, note:'Тихая, беспроводная'},
+  {id:'dock', name:'Док-станция USB-C 9-в-1', q:'док-станция USB-C 9 в 1', price:5500, note:'HDMI, USB-A, картридер'},
+  {id:'stand', name:'Подставка для ноутбука с охлаждением', q:'подставка для ноутбука с охлаждением', price:2500, note:'Алюминий, 2 вентилятора'},
+];
+const LAP_WAR = [
+  {id:'none', name:'Стандартная гарантия', price:0, note:'12 месяцев'},
+  {id:'ext', name:'Расширенная гарантия +12 месяцев', q:'расширенная гарантия на ноутбук', price:6000, note:'Итого 24 месяца'},
+];
+
+// ===== ПРАВИЛА СОВМЕСТИМОСТИ И ОПИСАНИЕ ЗАКАЗОВ =====
+const fmtGb = g => g >= 1000 ? (g / 1000) + ' ТБ' : g + ' ГБ';
+const rub = n => n.toLocaleString('ru-RU').replace(/ /g, ' ') + ' ₽';
+
+const SPEC = {
+  cpu: o => `${o.socket} · ${o.cores} ядер / ${o.threads} потоков · ${o.ghz} · до ${o.maxW} Вт`,
+  mb: o => `${o.socket} · ${o.ram} · ${o.ff}`,
+  ram: o => `${o.type} · ${o.gb} ГБ`,
+  gpu: o => `${o.vram} ГБ · ${o.w} Вт · длина ${o.len} мм · БП от ${o.rec} Вт`,
+  cooler: o => o.type === 'aio' ? `СЖО ${o.rad} мм · до ${o.tdp} Вт` : `Башня · до ${o.tdp} Вт · высота ${o.h} мм`,
+  ssd: o => `${fmtGb(o.gb)} · NVMe`,
+  psu: o => `${o.w} Вт · ${o.cert}${o.atx3 ? ' · ATX 3.x' : ''}`,
+  case: o => `${o.ff} · видеокарта до ${o.gpu} мм · кулер до ${o.cooler} мм · СЖО ${o.rad ? 'до ' + o.rad + ' мм' : 'нет'}`,
+  model: o => `${o.gpu} · ${o.ram} ГБ · SSD ${fmtGb(o.ssd)} · ${o.kg} кг`,
+  ramUp: o => o.note, ssdUp: o => o.note, acc: o => o.note, war: o => o.note,
+};
+
+// Каждое правило: вернёт null, если нужных деталей ещё нет, иначе {ok, involves, bad, good}
+const PC_RULES = [
+  c => c.cpu && c.mb && {ok: c.cpu.socket === c.mb.socket, involves: ['cpu', 'mb'],
+    bad: `Сокет процессора ${c.cpu.socket} не подходит к плате (${c.mb.socket}). Он просто не встанет в разъём.`,
+    good: `Сокет процессора и платы совместим (${c.cpu.socket}).`},
+  c => c.ram && c.mb && {ok: c.ram.type === c.mb.ram, involves: ['ram', 'mb'],
+    bad: `Память ${c.ram.type} не войдёт в слоты ${c.mb.ram}: ключ в другом месте. Сломаешь слот.`,
+    good: `Память ${c.ram.type} поддерживается платой.`},
+  c => c.cpu && c.cooler && {ok: c.cooler.tdp >= c.cpu.cool, involves: ['cpu', 'cooler'],
+    bad: `Кулер рассеивает ${c.cooler.tdp} Вт, а процессору нужно около ${c.cpu.cool} Вт. Уйдёт в троттлинг и будет шуметь.`,
+    good: `Кулер справляется с процессором (${c.cooler.tdp} Вт против ${c.cpu.cool} Вт).`},
+  c => c.cpu && c.gpu && c.psu && (() => {
+    const peak = c.cpu.maxW + c.gpu.w, need = Math.max(peak + 120, c.gpu.rec), ok = c.psu.w >= need;
+    return {ok, involves: ['cpu', 'gpu', 'psu'],
+      bad: `Не хватает мощности блока питания. Пик CPU ${c.cpu.maxW} Вт + GPU ${c.gpu.w} Вт + запас 120 Вт, итого нужно от ${need} Вт, а здесь ${c.psu.w} Вт.`,
+      good: `БП ${c.psu.w} Вт: пиковая нагрузка около ${peak} Вт (${Math.round(peak / c.psu.w * 100)}% мощности блока), запас достаточный.`};
+  })(),
+  c => c.gpu && c.psu && !c.cpu && {ok: c.psu.w >= c.gpu.rec, involves: ['gpu', 'psu'],
+    bad: `Производитель видеокарты требует БП не меньше ${c.gpu.rec} Вт, а здесь ${c.psu.w} Вт.`, good: ''},
+  c => c.gpu && c.psu && c.gpu.atx3 && {ok: !!c.psu.atx3, involves: ['gpu', 'psu'],
+    bad: `Видеокарте нужен разъём 12V-2x6 на 600 Вт. В этом блоке питания его нет, только ATX 2.x.`,
+    good: `У БП есть разъём 12V-2x6 для видеокарты.`},
+  c => c.mb && c.case && {ok: !(c.mb.ff === 'ATX' && c.case.ff === 'mATX'), involves: ['mb', 'case'],
+    bad: `ATX-плата не влезет в корпус формата mATX.`, good: `Плата (${c.mb.ff}) помещается в корпус.`},
+  c => c.gpu && c.case && {ok: c.gpu.len <= c.case.gpu, involves: ['gpu', 'case'],
+    bad: `Видеокарта ${c.gpu.len} мм, а в корпусе места только ${c.case.gpu} мм. Упрётся в корзину.`,
+    good: `Видеокарта ${c.gpu.len} мм укладывается в корпус (до ${c.case.gpu} мм).`},
+  c => c.cooler && c.case && c.cooler.type === 'air' && {ok: c.cooler.h <= c.case.cooler, involves: ['cooler', 'case'],
+    bad: `Башня высотой ${c.cooler.h} мм не даст закрыть боковую панель (максимум ${c.case.cooler} мм).`,
+    good: `Кулер ${c.cooler.h} мм проходит по высоте (до ${c.case.cooler} мм).`},
+  c => c.cooler && c.case && c.cooler.type === 'aio' && {ok: c.cooler.rad <= c.case.rad, involves: ['cooler', 'case'],
+    bad: c.case.rad ? `Радиатор ${c.cooler.rad} мм не встанет: корпус держит максимум ${c.case.rad} мм.` : `В этом корпусе вообще нет места под радиатор СЖО.`,
+    good: `Радиатор ${c.cooler.rad} мм встаёт в корпус.`},
+];
+const pcRules = cfg => PC_RULES.map(r => r(cfg)).filter(Boolean);
+
+function pcInfos(c) {
+  const w = [];
+  if (c.mb && c.cpu && c.mb.weak && c.cpu.kseries) w.push({score: true, t: `Плата H610 с K-процессором: питание на пределе, процессор будет сбрасывать частоты.`});
+  if (c.cpu && c.cpu.legacy) w.push({score: false, t: `AM4 — завершённая платформа: апгрейдить процессор потом почти некуда.`});
+  if (c.psu && c.psu.cert === '—') w.push({score: true, t: `БП без сертификата 80 PLUS: КПД и защиты на уровне «как повезёт».`});
+  if (c.gpu && c.gpu.id === 'gtx1650') w.push({score: false, t: `Видеокарта б/у: гарантия только от сервиса, 3 месяца.`});
+  return w;
+}
+
+const LAP_RULES = [
+  c => c.model && c.ram && c.ram.upTo && {ok: !c.model.ramSoldered, involves: ['model', 'ram'],
+    bad: `У этой модели оперативная память распаяна на плате. Заменить или добавить её нельзя.`, good: `Память ноутбука можно заменить.`},
+  c => c.model && c.ram && c.ram.upTo && !c.model.ramSoldered && {ok: c.ram.upTo > c.model.ram, involves: ['model', 'ram'],
+    bad: `В этой модели уже ${c.model.ram} ГБ. Такой апгрейд ничего не даёт.`, good: `Апгрейд памяти имеет смысл.`},
+  c => c.model && c.ssd && c.ssd.upTo && {ok: c.ssd.upTo > c.model.ssd, involves: ['model', 'ssd'],
+    bad: `В ноутбуке уже стоит SSD на ${fmtGb(c.model.ssd)}. Менять на такой же объём нет смысла.`, good: `Объём SSD увеличивается.`},
+];
+const lapRules = cfg => LAP_RULES.map(r => r(cfg)).filter(Boolean);
+const lapRam = c => !c.model ? 0 : (c.ram && c.ram.upTo ? c.ram.upTo : c.model.ram);
+const lapSsd = c => !c.model ? 0 : (c.ssd && c.ssd.upTo ? c.ssd.upTo : c.model.ssd);
+
+// ===== ШАГИ =====
+const PC_STEPS = [
+  {id: 'cpu', title: 'Процессор', options: CPU},
+  {id: 'mb', title: 'Материнская плата', options: MB},
+  {id: 'ram', title: 'Оперативная память', options: RAM},
+  {id: 'gpu', title: 'Видеокарта', options: GPU},
+  {id: 'cooler', title: 'Охлаждение', options: COOLER},
+  {id: 'ssd', title: 'Накопитель', options: SSD},
+  {id: 'psu', title: 'Блок питания', options: PSU},
+  {id: 'case', title: 'Корпус', options: CASE},
+];
+const LAP_STEPS = [
+  {id: 'model', title: 'Модель', options: LAPTOPS, req: true},
+  {id: 'ram', title: 'Оперативная память', options: LAP_RAM, specKey: 'ramUp', pre: LAP_RAM[0]},
+  {id: 'ssd', title: 'Накопитель', options: LAP_SSD, specKey: 'ssdUp', pre: LAP_SSD[0]},
+  {id: 'acc', title: 'Аксессуары', options: LAP_ACC, multi: true, specKey: 'acc'},
+  {id: 'war', title: 'Гарантия', options: LAP_WAR, specKey: 'war', pre: LAP_WAR[0]},
+];
+
+// ===== ЗАКАЗЫ =====
+const ORDERS = {
+  ep1: {
+    id: 'ep1', kind: 'pc', tier: 'b', tierName: 'Бюджет', client: 'nikita', clientName: 'Никита Воробьёв', role: 'Студент, курьер на подработке',
+    title: 'Игровой ПК для Никиты', project: 'Бюджетный 1080p', budget: 100000,
+    brief: 'Хочет без лагов играть в CS2 и Dota 2 на мониторе 1080p и тянуть учёбу. Накопил 100 000 ₽.',
+    steps: PC_STEPS, rules: pcRules, infos: pcInfos,
+    needs: [
+      {t: 'Видеокарта не слабее RTX 5060 (1080p без лагов)', ok: c => c.gpu && c.gpu.tier >= 2},
+      {t: 'Оперативной памяти не меньше 16 ГБ', ok: c => c.ram && c.ram.gb >= 16},
+      {t: 'SSD не меньше 500 ГБ', ok: c => c.ssd && c.ssd.gb >= 500},
+    ],
+  },
+  ep2: {
+    id: 'ep2', kind: 'laptop', tier: 'm', tierName: 'Средний', client: 'alisa', clientName: 'Алиса Громова', role: 'Дизайнер, работает из коворкингов',
+    title: 'Ноутбук для Алисы', project: 'Мобильная графика', budget: 130000,
+    brief: 'Старый ноутбук умер перед сдачей макетов. Нужен лёгкий, до 2 кг, с запасом памяти и диском от 1 ТБ. Бюджет 130 000 ₽.',
+    steps: LAP_STEPS, rules: lapRules, infos: () => [],
+    needs: [
+      {t: 'Вес не больше 2 кг (возит каждый день)', ok: c => c.model && c.model.kg <= 2.0},
+      {t: 'Оперативной памяти не меньше 16 ГБ', ok: c => lapRam(c) >= 16},
+      {t: 'SSD не меньше 1 ТБ', ok: c => lapSsd(c) >= 1000},
+    ],
+  },
+  ep3: {
+    id: 'ep3', kind: 'pc', tier: 'm', tierName: 'Средний', client: 'marina', clientName: 'Марина Ковалёва', role: 'Преподаватель 3D и архитектуры',
+    title: 'Рабочая станция для Марины', project: 'Баланс 1440p', budget: 180000,
+    brief: 'Рендерит в Blender, играет в 1440p и не терпит шума в аудитории. Бюджет до 180 000 ₽.',
+    steps: PC_STEPS, rules: pcRules, infos: pcInfos,
+    needs: [
+      {t: 'Видеокарта уровня RTX 5070 или выше (рендер и 1440p)', ok: c => c.gpu && c.gpu.tier >= 4},
+      {t: 'Оперативной памяти 32 ГБ и больше', ok: c => c.ram && c.ram.gb >= 32},
+      {t: 'SSD от 1 ТБ', ok: c => c.ssd && c.ssd.gb >= 1000},
+      {t: 'Блок питания 80+ Gold (работает часами)', ok: c => c.psu && /Gold/.test(c.psu.cert)},
+    ],
+  },
+  ep4: {
+    id: 'ep4', kind: 'pc', tier: 'h', tierName: 'Высокий', client: 'viktor', clientName: 'Виктор Соколов', role: 'Стример, VIP-клиент',
+    title: 'Флагман для Виктора', project: 'Станция для стрима 4K', budget: 350000,
+    brief: 'Стримит в 4K, монтирует и рендерит. Хотел RTX 4090, но их уже не достать. Нужен флагман, тихо, красиво, СЖО 360. Срок до 25.11, бюджет 350 000 ₽.',
+    steps: PC_STEPS, rules: pcRules, infos: pcInfos,
+    needs: [
+      {t: 'Видеокарта уровня RTX 5070 Ti / RX 9070 XT или выше', ok: c => c.gpu && c.gpu.tier >= 5},
+      {t: 'Оперативной памяти 64 ГБ', ok: c => c.ram && c.ram.gb >= 64},
+      {t: 'SSD 2 ТБ', ok: c => c.ssd && c.ssd.gb >= 2000},
+      {t: 'Процессор от 16 потоков', ok: c => c.cpu && c.cpu.threads >= 16},
+      {t: 'Жидкостное охлаждение 360 мм (тишина)', ok: c => c.cooler && c.cooler.type === 'aio'},
+    ],
+  },
+};
+const ORDER_IDS = ['ep1', 'ep2', 'ep3', 'ep4'];
+
+const totalOf = (def, cfg) => {
+  let t = 0;
+  for (const s of def.steps) {
+    const v = cfg[s.id];
+    if (!v) continue;
+    t += Array.isArray(v) ? v.reduce((a, o) => a + o.price, 0) : v.price;
+  }
+  return t;
+};
+
+function evaluate(def, st) {
+  const cfg = st.cfg, total = totalOf(def, cfg);
+  const unmet = def.needs.filter(n => !n.ok(cfg));
+  const infos = def.infos(cfg);
+  const over = total - def.budget;
+  let score = 100;
+  score -= Math.min(st.attempts * 7, 28);
+  score -= st.hintSteps.size * 8;
+  score -= unmet.length * 14;
+  if (over > 0) score -= over <= def.budget * 0.1 ? 10 : 28;
+  score -= infos.filter(i => i.score).length * 5;
+  score = Math.max(0, score);
+  const stars = score >= 88 ? 5 : score >= 72 ? 4 : score >= 55 ? 3 : score >= 38 ? 2 : 1;
+  const tier = stars >= 4 ? 'good' : stars === 3 ? 'ok' : 'bad';
+  return {total, unmet, infos, over, score, stars, tier, attempts: st.attempts, hints: st.hintSteps.size};
+}
+
+const storeLinks = o => {
+  const q = encodeURIComponent(o.q || o.name);
+  return {dns: `https://www.dns-shop.ru/search/?q=${q}`, cl: `https://www.citilink.ru/search/?text=${q}`};
+};
+
+// ===== СЦЕНАРИЙ =====
+const B_ = (k) => ['bg', k], SH = (c, t, p) => ['show', c, t, p], HD = c => ['hide', c], N = t => ['narr', t];
+const SAY = (c, t, tag) => ['say', c, t, tag], L = n => ['label', n], J = n => ['jump', n];
+const D = (t, tag) => SAY('dmitry', t, tag), K = (t, tag) => SAY('katya', t, tag), A = (t, tag) => SAY('artem', t, tag);
+
+const SCRIPT = [
+  // ---------- ПРОЛОГ ----------
+  B_('street'),
+  N('20 ноября, вечер. Подвал в панельной пятиэтажке. Над дверью горит фиолетовая вывеска: «Кремний и ток».'),
+  N('Ты, Артём, работаешь здесь третий месяц. Сегодня Дима позвал тебя пораньше. Сказал, что день будет большой.'),
+  B_('desk'),
+  SH('dmitry', 'n', 'r'),
+  D('Явился. Чайник поставил? Нет? Ладно, садись.', 'mug'),
+  D('Смотри на доску. Четыре заказа, и все до конца месяца.', 'talk'),
+  D('Никита, студент, считает каждую копейку. Алиса, дизайнер, у неё умер ноутбук. Марина преподаёт 3D, ей нужна рабочая лошадка.', 'talk'),
+  D('И Виктор Соколов. Стример. Деньги есть, терпения мало. С ним аккуратнее.', 'serious'),
+  A('Четыре сборки за неделю? Нас тут трое.', 'surprise'),
+  D('Поэтому сегодня Катя будет твоим вторым пилотом. Катя!', 'smug'),
+  SH('katya', 'joy', 'l'),
+  K('Я тут! Паяльник остыл, как раз успею тебя помучить.', 'joy'),
+  K('Слушай внимательно, Артём. Любая сборка держится на нескольких правилах. Ошибёшься в одном, и железо не заработает или сгорит.', 'serious'),
+  K('Правило первое: сокет. Процессор и плата должны подходить друг другу, как ключ и замок.', 'talk'),
+  ['choice', 'Катя: Берём Ryzen 5 7500F. Какой сокет должен быть у платы?', [['AM4', 'q1_bad'], ['AM5', 'q1_ok'], ['LGA1700', 'q1_bad']]],
+  L('q1_bad'), K('Нет. AM4 для Ryzen 5000, LGA1700 для Intel. Для 7500F нужен AM5.', 'serious'), J('q2'),
+  L('q1_ok'), K('Верно, AM5. Ты сэкономил нам час нервов.', 'joy'),
+  L('q2'),
+  K('Правило второе: память. DDR4 и DDR5 не взаимозаменяемы, ключ в слоте стоит в разных местах.', 'talk'),
+  ['choice', 'Катя: Плата на DDR4. Какую память берём?', [['DDR4', 'q2_ok'], ['DDR5, она новее', 'q2_bad']]],
+  L('q2_bad'), K('Новее не значит подойдёт. Она просто не встанет. Берём DDR4.', 'serious'), J('q3'),
+  L('q2_ok'), K('Вот, схватываешь.', 'laugh'),
+  L('q3'),
+  K('Правило третье: питание. Мощность блока питания = процессор + видеокарта + запас около 120 Вт.', 'talk'),
+  ['choice', 'Катя: Видеокарта 300 Вт, процессор до 160 Вт. Какой блок минимум?', [['450 Вт', 'q3_bad'], ['650 Вт', 'q3_ok'], ['1000 Вт, на всякий случай', 'q3_meh']]],
+  L('q3_bad'), K('Не потянет: 300 + 160 + 120 = 580. Нужно хотя бы 650.', 'serious'), J('qend'),
+  L('q3_meh'), K('Заработает, но клиент заплатит лишних пять тысяч ни за что. 650 хватит.', 'think'), J('qend'),
+  L('q3_ok'), K('Именно. Умница.', 'joy'),
+  L('qend'),
+  K('И габариты: длина видеокарты и высота кулера должны влезть в корпус, а кулер должен справляться с теплом процессора.', 'talk'),
+  K('Если ошибёшься при выборе, я предупрежу. Могу даже подсказать, что подходит, но каждая подсказка стоит тебе очков.', 'smug'),
+  D('И ещё. Цены в чеках у нас ориентировочные. Сверяем с DNS и Ситилинком, ссылки будут в каждом чеке. Перед покупкой проверяй на сайте, цены плавают.', 'talk'),
+  B_('storeroom'),
+  N('Дима открывает склад. Полки до потолка, коробки ASUS, MSI, Gigabyte, ящики с вентиляторами. Отдельная полка подписана «Б/У техника».'),
+  D('Если клиент совсем в обрезе, посмотрим б/у. Но экономить на видеокарте это как экономить на парашюте.', 'smug'),
+  B_('desk'),
+  D('Всё, хватит лекций. Заказы на доске. Бери любой.', 'laugh'),
+  ['hub'],
+  // ---------- ЭПИЗОД 1: НИКИТА ----------
+  L('intro_ep1'),
+  B_('desk'), SH('katya', 'n', 'l'),
+  SH('nikita', 'wave', 'r'),
+  SAY('nikita', 'Здрасьте! Вы «Кремний и ток»? Мне Дима сказал приходить.', 'wave'),
+  SAY('nikita', 'Короче, я на втором курсе и подрабатываю курьером. Накопил сто тысяч. Хочу играть в КС2 и Доту без лагов, и чтобы для учёбы хватало.', 'talk'),
+  A('Сто тысяч нормальный бюджет. Монитор у тебя какой?'),
+  SAY('nikita', 'Обычный, 1080p, 144 герца.', 'chill'),
+  K('Тогда на 4К-видеокарту не переплачиваем. Но и на видеокарте не экономим.', 'serious'),
+  SAY('nikita', 'А оперативки побольше можно? У меня Хром жрёт всё.', 'shy'),
+  K('Можно. Артём, это твой заказ. Давай собирай.', 'smug'),
+  ['build', 'ep1'],
+  L('after_ep1_good'), B_('student'), SH('nikita', 'joy', 'c'),
+  SAY('nikita', 'Оно просто летает! В КС2 сто сорок кадров, Хром открыл сорок вкладок и не заикнулся!', 'joy'),
+  SAY('nikita', 'Спасибо, мужик. Кот уже сидит на системнике и греется.', 'wave'), J('end_ep1'),
+  L('after_ep1_ok'), B_('student'), SH('nikita', 'n', 'c'),
+  SAY('nikita', 'Ну... работает. Но кое-чего мне не хватает. Ладно, пока сойдёт.', 'shy'), J('end_ep1'),
+  L('after_ep1_bad'), B_('student'), SH('nikita', 'sad', 'c'),
+  SAY('nikita', 'Это не то, о чём мы договаривались. Буду копить дальше.', 'serious'),
+  A('Прости. В следующий раз я проверю всё внимательнее.', 'sad'),
+  L('end_ep1'), ['fn', () => { S.labels.hub_ok = 1; }], ['hub'],
+  // ---------- ЭПИЗОД 2: АЛИСА ----------
+  L('intro_ep2'),
+  B_('cowork'), SH('alisa', 'shy', 'r'),
+  SAY('alisa', 'Ноутбук умер за час до сдачи макетов. Я теперь рисую на планшете и молюсь.', 'shy'),
+  A('Ему сколько лет было?'),
+  SAY('alisa', 'Семь. Он выдержал больше, чем мои отношения.', 'laugh'),
+  SAY('alisa', 'Мне нужен новый. Легче двух килограммов, я каждый день езжу между коворкингом и кафе. Памяти побольше, диск от терабайта. Бюджет сто тридцать тысяч.', 'talk'),
+  K('Игровой ноутбук на два с половиной кило ты сама таскать не будешь.', 'smug'),
+  SAY('alisa', 'Вот именно!', 'joy'),
+  A('Посмотрим модели. И проверим, где память можно заменить, а где она припаяна.', 'think'),
+  ['build', 'ep2'],
+  L('after_ep2_good'), B_('cafe'), SH('alisa', 'joy', 'c'),
+  SAY('alisa', 'Полтора килограмма, экран прекрасный, макеты рендерятся быстрее, чем я успеваю допить кофе. Беру с собой в рюкзак!', 'joy'), J('end_ep2'),
+  L('after_ep2_ok'), B_('cafe'), SH('alisa', 'think', 'c'),
+  SAY('alisa', 'Хороший ноутбук, но кое-что я себе представляла иначе. Будем жить.', 'think'), J('end_ep2'),
+  L('after_ep2_bad'), B_('cafe'), SH('alisa', 'sad', 'c'),
+  SAY('alisa', 'Он тяжёлый, или мало памяти, или диск маленький... В общем, я зря ездила к вам.', 'sad'),
+  A('Мы исправим. Приезжай ещё раз.', 'sad'),
+  L('end_ep2'), ['hub'],
+  // ---------- ЭПИЗОД 3: МАРИНА ----------
+  L('intro_ep3'),
+  B_('class'), SH('marina', 'tab', 'r'),
+  SAY('marina', 'Рендер одной сцены у меня идёт сорок минут. Студенты за это время успевают пообедать.', 'glasses'),
+  SAY('marina', 'Мне нужна станция для Blender и для проектов в 3D, плюс играть вечерами в 1440p. И чтобы не гудела: у меня лекции.', 'talk'),
+  K('Значит, нужна видеокарта посильнее и приличный блок питания.', 'talk'),
+  SAY('marina', 'Бюджет до ста восьмидесяти тысяч. Память хочу побольше.', 'shy'),
+  A('Тогда память 32 ГБ и диск от терабайта. Давай посмотрим, что у нас есть.', 'think'),
+  ['build', 'ep3'],
+  L('after_ep3_good'), B_('class'), SH('marina', 'joy', 'c'),
+  SAY('marina', 'Сорок минут стали четырьмя. Студенты в шоке, я в восторге.', 'joy'), J('end_ep3'),
+  L('after_ep3_ok'), B_('class'), SH('marina', 'think', 'c'),
+  SAY('marina', 'Работает. Но по рендерам хотелось бы шустрее. Ладно, спасибо.', 'think'), J('end_ep3'),
+  L('after_ep3_bad'), B_('class'), SH('marina', 'serious', 'c'),
+  SAY('marina', 'Я рассчитывала на другое. С такой машиной я рендер не ускорю.', 'serious'),
+  A('Понял. Исправим.', 'sad'),
+  L('end_ep3'), ['hub'],
+  // ---------- ЭПИЗОД 4: ВИКТОР ----------
+  L('intro_ep4'),
+  B_('expo'), N('Месяц назад. Выставка. Стойка «Кремний и тока» среди гигантов ASUS, MSI, AMD и Intel.'),
+  SH('viktor', 'serious', 'r'),
+  SAY('viktor', 'У вас единственная стойка, где мне нормально объяснили, а не впаривали.', 'serious'),
+  D('Работаем честно, Виктор.', 'smug'),
+  SAY('viktor', 'Я позвоню.', 'serious'),
+  B_('meeting'), SH('viktor', 'serious', 'r'),
+  N('Сегодня. Переговорная. На экране презентация «Премиальная сборка для Виктора Соколова».'),
+  SAY('viktor', 'Я хотел 4090. Говорят, их уже нет в продаже. Ладно, собери мне лучше.', 'talk'),
+  SAY('viktor', 'Стрим в 4К, монтаж, рендер. Тихо. Красиво. СЖО на 360. Срок до 25-го. Бюджет триста пятьдесят.', 'serious'),
+  K('Шесть тысяч подписчиков на стриме замечают, когда кулер воет, да?', 'smug'),
+  SAY('viktor', 'Замечают. И пишут об этом в чат.', 'grumpy'),
+  A('Сделаю. Начну с процессора и охлаждения.', 'serious'),
+  ['build', 'ep4'],
+  L('after_ep4_good'), B_('twitch'), SH('viktor', 'laugh', 'c'),
+  SAY('viktor', 'Поставил на стрим. Чат взорвался. Ни шума, ни просадок. Вы знаете своё дело.', 'laugh'), J('end_ep4'),
+  L('after_ep4_ok'), B_('twitch'), SH('viktor', 'think', 'c'),
+  SAY('viktor', 'Работает. Но я просил по-другому. Больше так не делайте.', 'think'), J('end_ep4'),
+  L('after_ep4_bad'), B_('twitch'), SH('viktor', 'angry', 'c'),
+  SAY('viktor', 'Это вообще не то, что я просил! Я теряю зрителей прямо сейчас!', 'angry'),
+  D('Мы всё исправим, Виктор. Бесплатно.', 'serious'),
+  L('end_ep4'), ['hub'],
+  // ---------- ЭПИЛОГ ----------
+  L('epilogue'),
+  B_('room'), N('Поздний вечер. Дома у Артёма на доске у стола все четыре дедлайна отмечены галочками.'),
+  SH('artem', 'n', 'l'),
+  A('Четыре заказа за неделю. Кто бы мог подумать.', 'blink'),
+  B_('balcony'), SH('dmitry', 'mug', 'r'),
+  D('Вот ты где. Дымить не буду, я бросил. Это просто пепельница от старых времён.', 'mug'),
+  D('Знаешь, чему тебя учит сборка? Не железу. Железо меняется каждые два года. Учит слушать клиента.', 'talk'),
+  A('И считать мощность блока питания.', 'blink'),
+  D('И это тоже.', 'laugh'),
+  K('Эй, философы! Нас Виктор зовёт на стрим. Чат хочет увидеть сборщика!', 'joy'),
+  N('Конец смены. «Кремний и ток» работает дальше.'),
+  ['finale'],
+];
+
+// ===== ДВИЖОК =====
+const $ = s => document.querySelector(s);
+const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
+const esc = s => String(s).replace(/[&<>"]/g, m => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[m]));
+const LOGO = `<svg viewBox="0 0 64 64" class="logo" aria-hidden="true"><g fill="none" stroke="#9d6cff" stroke-width="4" stroke-linecap="round"><rect x="16" y="16" width="32" height="32" rx="5"/><rect x="26" y="26" width="12" height="12" rx="2"/><path d="M24 6v6M32 6v6M40 6v6M24 52v6M32 52v6M40 52v6M6 24h6M6 32h6M6 40h6M52 24h6M52 32h6M52 40h6"/></g></svg>`;
+
+const CH = {
+  artem: {name: 'Артём', color: '#8ab4ff', file: 'artem2', poses: {n: 1, blink: 2, talk: 3, think: 4, shy: 5, surprise: 6, serious: 7, sad: 8}},
+  dmitry: {name: 'Дядя Дима', color: '#ffb454', file: 'dmitry', poses: {n: 1, serious: 2, mug: 3, talk: 4, sip: 5, think: 6, laugh: 7, smug: 8}, bust: [5, 6, 7, 8]},
+  katya: {name: 'Катя «Винтик»', color: '#ff7fb0', file: 'katya', poses: {n: 1, serious: 2, laugh: 3, talk: 4, shy: 5, think: 6, joy: 7, sad: 8}},
+  nikita: {name: 'Никита', color: '#ffd68a', file: 'nikita', poses: {n: 1, chill: 2, wave: 3, talk: 4, shy: 5, serious: 6, surprise: 7, joy: 8, sad: 6}},
+  alisa: {name: 'Алиса', color: '#d8c3ff', file: 'alisa', poses: {n: 1, tab: 2, laugh: 3, serious: 4, shy: 5, think: 6, joy: 7, sad: 8, surprise: 7}},
+  marina: {name: 'Марина', color: '#c79bff', file: 'marina', poses: {n: 1, tab: 2, glasses: 3, serious: 4, shy: 5, think: 6, surprise: 7, joy: 8, talk: 3, sad: 4, laugh: 8}},
+  viktor: {name: 'Виктор', color: '#9ff0c0', file: 'viktor', poses: {n: 1, serious: 2, think: 3, laugh: 4, grumpy: 5, talk: 6, angry: 7, crouch: 8, sad: 5, joy: 4, surprise: 6}},
+};
+const spriteUrl = (c, tag) => { const ch = CH[c]; const n = ch.poses[tag] || 1; return {url: `img/ch/${ch.file}_0${n}.png`, key: `${ch.file}_0${n}`, bust: ch.bust && ch.bust.includes(n)}; };
+const BG = k => `img/bg/${k}.jpg`;
+
+const S = {done: {}, cfgs: {}, evals: {}, last: null, pc: 0, labels: {}, script: [], stage: {}};
+let typing = null, waitClick = null, curBg = 0;
+
+// ---------- сцена ----------
+function setBg(k) {
+  const a = $('#bgA'), b = $('#bgB'); const next = curBg ? a : b, prev = curBg ? b : a; curBg ^= 1;
+  next.style.backgroundImage = `url(${BG(k)})`; next.classList.remove('off'); prev.classList.add('off');
+}
+const SLOT = {l: 22, c: 50, r: 78};
+function placeSprite(c, tag, pos) {
+  let img = document.querySelector(`.spr[data-c="${c}"]`);
+  const sp = spriteUrl(c, tag), h = MAN[sp.key] ? MAN[sp.key][1] : 480;
+  const fill = window.innerWidth <= 640 ? 0.78 : 0.94;
+  // ФИКС: Дима всегда того же размера, что и его первый спрайт (dmitry_01)
+  const refH = c === 'dmitry' ? (MAN['dmitry_01'] ? MAN['dmitry_01'][1] : h) : h;
+  const scale = (refH / 512) * fill;
+  const isNew = !img;
+  if (!img) { img = el('img', 'spr in'); img.dataset.c = c; img.alt = CH[c].name; $('#sprites').appendChild(img); }
+  else { img.classList.remove('pop'); void img.offsetWidth; img.classList.add('pop'); }
+  img.src = sp.url; img.style.height = (scale * 100).toFixed(1) + '%';
+  const p = pos || img.dataset.pos || 'c'; img.dataset.pos = p; img.style.left = SLOT[p] + '%';
+  return img;
+}
+function hideSprite(c) { const s = c === 'all' ? [...document.querySelectorAll('.spr')] : [document.querySelector(`.spr[data-c="${c}"]`)]; s.forEach(i => i && i.remove()); }
+function dimExcept(c) { document.querySelectorAll('.spr').forEach(i => i.classList.toggle('dim', !!c && i.dataset.c !== c)); }
+
+// ---------- текст ----------
+function typeText(txt, narr, who) {
+  const box = $('#txt'); box.className = 'txt' + (narr ? ' narr' : ''); box.textContent = '';
+  const w = $('#who'); if (who) { w.textContent = CH[who].name; w.style.color = CH[who].color; w.classList.remove('hidden'); } else w.classList.add('hidden');
+  $('#next').classList.add('hidden'); let i = 0; clearInterval(typing);
+  typing = setInterval(() => { i += 2; box.textContent = txt.slice(0, i); if (i >= txt.length) finishType(txt); }, 22);
+  waitClick = () => { if (typing) finishType(txt); else { waitClick = null; step(); } };
+  S.curTxt = txt;
+}
+function finishType(txt) { clearInterval(typing); typing = null; $('#txt').textContent = txt; $('#next').classList.remove('hidden'); }
+
+// ---------- шаги ----------
+const T = {
+  bg: s => { setBg(s[1]); step(); },
+  show: s => { placeSprite(s[1], s[2] || 'n', s[3]); step(); },
+  hide: s => { hideSprite(s[1]); step(); },
+  say: s => { const [, c, txt, tag] = s; if (tag) placeSprite(c, tag); else if (!document.querySelector(`.spr[data-c="${c}"]`) && c !== 'artem') placeSprite(c, 'n');
+    dimExcept(document.querySelector(`.spr[data-c="${c}"]`) ? c : null); typeText(txt, false, c); },
+  narr: s => { dimExcept(null); typeText(s[1], true, null); },
+  choice: s => { const [, prompt, opts] = s; showChoices(prompt, opts); },
+  label: () => step(),
+  jump: s => { S.pc = S.labels[s[1]]; step(); },
+  fn: s => { s[1](); step(); },
+  branch: s => { const l = s[1](); S.pc = S.labels[l]; step(); },
+  build: s => { startBuild(s[1]); },
+  hub: () => showHub(),
+  title: () => showTitle(),
+  finale: () => showFinale(),
+};
+function step() {
+  const s = S.script[S.pc++]; if (!s) return;
+  if (s[0] === 'label') return step();
+  T[s[0]](s);
+}
+function showChoices(prompt, opts) {
+  const c = $('#choices'); c.innerHTML = ''; c.classList.remove('hidden');
+  if (prompt) c.appendChild(el('div', 'prompt', esc(prompt)));
+  opts.forEach(([t, lbl]) => { const b = el('button', 'choice', esc(t)); b.onclick = () => { c.classList.add('hidden'); S.pc = S.labels[lbl]; step(); }; c.appendChild(b); });
+  waitClick = null;
+}
+function load(script) {
+  S.script = script; S.labels = {}; script.forEach((s, i) => { if (s[0] === 'label') S.labels[s[1]] = i; });
+}
+
+// ---------- экраны ----------
+const screens = ['stageWrap', 'titleScr', 'hubScr', 'buildScr', 'receiptScr', 'finaleScr'];
+function show(id) { screens.forEach(s => $('#' + s).classList.toggle('hidden', s !== id)); window.scrollTo({top: 0}); }
+function showTitle() {
+  show('titleScr');
+}
+function startGame() { S.done = {}; S.cfgs = {}; S.evals = {}; hideSprite('all'); show('stageWrap'); load(SCRIPT); S.pc = 0; setBg('street'); step(); }
+
+function stars(n) { return '★'.repeat(n) + '☆'.repeat(5 - n); }
+function showHub() {
+  show('hubScr'); const w = $('#orders'); w.innerHTML = '';
+  ORDER_IDS.forEach(id => {
+    const d = ORDERS[id], done = S.done[id], ev = S.evals[id];
+    const c = el('div', 'order' + (done ? ' done' : ''));
+    c.innerHTML = `<div class="o-head"><img class="face" src="img/ch/${CH[d.client].file}_face.png" alt=""><div><div class="o-name">${esc(d.clientName)}</div><div class="o-role">${esc(d.role)}</div></div></div>
+      <div class="tags"><span class="tag t-${d.tier}">${d.tierName}</span><span class="tag">${d.kind === 'pc' ? 'Сборка ПК' : 'Ноутбук'}</span><span class="tag">до ${rub(d.budget)}</span></div>
+      <p>${esc(d.brief)}</p>${done ? `<div class="stars" aria-label="Оценка ${ev.stars} из 5">${stars(ev.stars)}</div>` : ''}`;
+    const a = el('div', 'o-actions');
+    const b = el('button', done ? 'btn ghost' : 'btn', done ? 'Пересобрать' : 'Взять заказ'); b.onclick = () => { S.replay = !!done; startOrder(id); };
+    a.appendChild(b);
+    if (done) { const r = el('button', 'btn ghost', 'Чек'); r.onclick = () => showReceipt(id, 'hub'); a.appendChild(r); }
+    c.appendChild(a); w.appendChild(c);
+  });
+  const all = ORDER_IDS.every(i => S.done[i]);
+  $('#endShift').disabled = !all; $('#endHint').textContent = all ? 'Все заказы сданы.' : `Сдано заказов: ${ORDER_IDS.filter(i => S.done[i]).length} из 4`;
+}
+function startOrder(id) { hideSprite('all'); show('stageWrap'); load(SCRIPT); S.pc = S.labels['intro_' + id]; step(); }
+
+// ---------- сборка ----------
+let B = null;
+function startBuild(id) {
+  const def = ORDERS[id];
+  B = {def, cfg: {}, attempts: 0, hintSteps: new Set(), cur: 0, hint: false, msg: null};
+  def.steps.forEach(s => { if (s.pre) B.cfg[s.id] = s.pre; if (s.multi) B.cfg[s.id] = []; });
+  show('buildScr'); renderBuild();
+}
+function hypo(stepId, opt) { const c = {...B.cfg}; c[stepId] = opt; return B.def.rules(c).filter(r => !r.ok && r.involves.includes(stepId)); }
+function pick(step, opt) {
+  if (step.multi) {
+    const arr = B.cfg[step.id], i = arr.findIndex(o => o.id === opt.id);
+    if (i >= 0) arr.splice(i, 1); else arr.push(opt);
+    B.msg = null; return renderBuild();
+  }
+  if (B.cfg[step.id] && B.cfg[step.id].id === opt.id && !step.pre) { delete B.cfg[step.id]; B.msg = null; return renderBuild(); }
+  const bad = hypo(step.id, opt);
+  if (bad.length) { B.attempts++; B.msg = {bad: true, t: bad.map(b => b.bad)}; return renderBuild(); }
+  B.cfg[step.id] = opt; B.msg = null;
+  const next = B.def.steps.findIndex((s, i) => i > B.cur && !B.cfg[s.id]);
+  if (next >= 0 && !step.pre) B.cur = next;
+  renderBuild();
+}
+function renderBuild() {
+  const {def} = B, w = $('#buildScr'), cfg = B.cfg, step = def.steps[B.cur];
+  const total = totalOf(def, cfg), pct = Math.min(100, Math.round(total / def.budget * 100)), over = total > def.budget;
+  const ready = def.kind === 'laptop' ? !!cfg.model : def.steps.every(s => !!cfg[s.id]);
+  w.innerHTML = `<div class="b-top"><img class="face" src="img/ch/${CH[def.client].file}_face.png" alt=""><div class="brief"><h2 class="h">${esc(def.title)}</h2><p>${esc(def.brief)}</p></div><button class="btn ghost" id="bBack">Выйти к заказам</button></div>
+  <div class="b-layout"><nav class="steps" id="steps"></nav><main><div class="opts-head"><h3>${esc(step.title)}</h3><button class="btn ghost" id="bHint">${B.hint ? 'Скрыть подсказки' : 'Спросить Катю о совместимости'}</button></div><div class="grid" id="grid"></div></main>
+  <aside class="sum"><h4>Что хочет клиент</h4><ul class="needs" id="needs"></ul>
+  <div><div class="tot"><span>Итого</span><span>${rub(total)}</span></div><div class="bar${over ? ' over' : ''}" role="img" aria-label="Бюджет использован на ${pct}%"><i style="width:${pct}%"></i></div><div class="fine" style="margin-top:4px">Бюджет: ${rub(def.budget)}${over ? ` · перебор ${rub(total - def.budget)}` : ''}</div></div>
+  <div class="katya${B.msg && B.msg.bad ? ' bad' : ''}"><img src="img/ch/katya_face.png" alt=""><div id="kmsg"></div></div>
+  <button class="btn" id="bDone" ${ready ? '' : 'disabled'}>Собрать и сдать заказ</button></aside></div>`;
+  const st = $('#steps');
+  def.steps.forEach((s, i) => {
+    const v = cfg[s.id], name = Array.isArray(v) ? (v.length ? v.length + ' шт.' : '') : (v ? v.name : ''), pr = Array.isArray(v) ? v.reduce((a, o) => a + o.price, 0) : (v ? v.price : 0);
+    const b = el('button', 'step' + (i === B.cur ? ' cur' : ''), `<div class="s-t">${i + 1}. ${esc(s.title)}</div><div class="s-v${name ? '' : ' empty'}">${esc(name || (s.multi ? 'не обязательно' : 'не выбрано'))}</div>${pr ? `<div class="s-p">${rub(pr)}</div>` : ''}`);
+    b.onclick = () => { B.cur = i; B.msg = null; renderBuild(); }; st.appendChild(b);
+  });
+  const g = $('#grid');
+  step.options.forEach(o => {
+    const sel = Array.isArray(cfg[step.id]) ? cfg[step.id].some(x => x.id === o.id) : (cfg[step.id] && cfg[step.id].id === o.id);
+    const b = el('button', 'card' + (sel ? ' sel' : ''));
+    const spec = (SPEC[step.specKey || step.id] || (() => ''))(o);
+    let badge = '';
+    if (B.hint && !step.multi) { const bad = hypo(step.id, o); badge = `<span class="badge ${bad.length ? 'bad' : 'ok'}">${bad.length ? 'не подходит' : 'подходит'}</span>`; }
+    b.innerHTML = `${badge}<div class="c-n">${esc(o.name)}</div>${spec ? `<div class="c-s">${esc(spec)}</div>` : ''}<div class="c-note">${esc(o.note || '')}</div><div class="c-p">${o.price ? rub(o.price) : 'бесплатно'}</div>`;
+    b.onclick = () => pick(step, o); g.appendChild(b);
+  });
+  const nl = $('#needs'); def.needs.forEach(n => { const ok = n.ok(cfg); nl.appendChild(el('li', '', `<span class="mk ${ok ? 'y' : 'n'}">${ok ? '✓' : '○'}</span><span>${esc(n.t)}</span>`)); });
+  $('#kmsg').innerHTML = B.msg ? B.msg.t.map(t => `<p>${esc(t)}</p>`).join('') : `<p>${B.hint ? 'Смотри бейджи на карточках: проверила совместимость с тем, что ты уже выбрал.' : 'Выбирай детали в любом порядке. Если что-то не подойдёт, я скажу.'}</p>`;
+  $('#bBack').onclick = () => showHub();
+  $('#bHint').onclick = () => { B.hint = !B.hint; if (B.hint) B.hintSteps.add(step.id); renderBuild(); };
+  $('#bDone').onclick = finishBuild;
+}
+function finishBuild() {
+  const ev = evaluate(B.def, B); S.done[B.def.id] = true; S.cfgs[B.def.id] = B.cfg; S.evals[B.def.id] = ev; S.last = {id: B.def.id, ev};
+  showReceipt(B.def.id, 'story');
+}
+
+// ---------- чек ----------
+function receiptRows(def, cfg) {
+  const rows = [];
+  def.steps.forEach(s => { const v = cfg[s.id]; if (!v) return; (Array.isArray(v) ? v : [v]).forEach(o => { if (def.kind === 'laptop' && o.price === 0 && s.id !== 'model') return; rows.push({cat: s.title, o, spec: (SPEC[s.specKey || s.id] || (() => ''))(o)}); }); });
+  return rows;
+}
+function checksFor(def, cfg) {
+  const r = def.rules(cfg).map(x => ({k: x.ok ? 'ok' : 'bd', t: x.ok ? x.good : x.bad})).filter(x => x.t);
+  def.needs.forEach(n => r.push({k: n.ok(cfg) ? 'ok' : 'nt', t: n.t + (n.ok(cfg) ? '' : ' — не выполнено')}));
+  def.infos(cfg).forEach(i => r.push({k: 'nt', t: i.t}));
+  return r;
+}
+function receiptText(def, cfg, ev) {
+  const L = ['МАСТЕРСКАЯ «КРЕМНИЙ И ТОК»', 'СПИСОК ПОКУПОК И СПЕЦИФИКАЦИЯ', `Проект: ${def.project}`, `Клиент: ${def.clientName}`, ''];
+  receiptRows(def, cfg).forEach((r, i) => { L.push(`${i + 1}. ${r.cat}: ${r.o.name}`, `   ${r.spec}`, `   Цена: ${rub(r.o.price)}`); });
+  L.push('', `ИТОГО: ${rub(ev.total)} (бюджет ${rub(def.budget)})`, '', 'ПРОВЕРКА:'); checksFor(def, cfg).forEach(c => L.push(`[${c.k === 'ok' ? '✓' : c.k === 'bd' ? '✗' : '!'}] ${c.t}`));
+  L.push('', 'Цены ориентировочные. Перед покупкой проверьте на dns-shop.ru и citilink.ru.'); return L.join('\n');
+}
+function showReceipt(id, from) {
+  const def = ORDERS[id], cfg = S.cfgs[id], ev = S.evals[id]; show('receiptScr'); const w = $('#receiptScr');
+  const rows = receiptRows(def, cfg).map((r, i) => { const l = storeLinks(r.o); return `<div class="r-row"><div><div class="cat">${i + 1}. ${esc(r.cat)}</div><div class="nm">${esc(r.o.name)}</div></div><div class="pr">${rub(r.o.price)}</div><div class="sp">${esc(r.spec)}</div><div class="lk"><a href="${l.dns}" target="_blank" rel="noopener">найти в DNS</a><a href="${l.cl}" target="_blank" rel="noopener">найти в Ситилинке</a></div></div>`; }).join('');
+  const chk = checksFor(def, cfg).map(c => `<li class="${c.k}">${c.k === 'ok' ? '[✓]' : c.k === 'bd' ? '[✗]' : '[!]'} ${esc(c.t)}</li>`).join('');
+  const verdict = from === 'story' ? `<div class="verdict"><img src="img/ch/katya_face.png" alt=""><div><div class="v-t">Катя: ${ev.stars >= 4 ? 'Отличная сборка' : ev.stars === 3 ? 'Рабочая, но есть вопросы' : 'Клиент будет недоволен'} · <span class="stars">${stars(ev.stars)}</span></div><div class="fine">Ошибок при выборе: ${ev.attempts}, подсказок: ${ev.hints}${ev.unmet.length ? `, не выполнено пожеланий: ${ev.unmet.length}` : ''}${ev.over > 0 ? `, перебор бюджета ${rub(ev.over)}` : ''}</div></div></div>` : '';
+  w.innerHTML = `${verdict}<article class="receipt"><h3>МАСТЕРСКАЯ «КРЕМНИЙ И ТОК»</h3><div class="r-sub">Список покупок и спецификация</div><div>Проект: <b>${esc(def.project)}</b><br>Клиент: ${esc(def.clientName)}<br>Магазины: DNS (dns-shop.ru) / Ситилинк (citilink.ru)</div><hr>${rows}<hr><div class="r-total"><span>ИТОГО</span><span>${rub(ev.total)}</span></div><div>Бюджет клиента: ${rub(def.budget)}</div><hr><b>СТАТУС ПРОВЕРКИ</b><ul class="r-chk">${chk}</ul><div class="r-foot">Цены ориентировочные и могут отличаться. Ссылки ведут на поиск по сайту магазина, перед покупкой проверьте наличие и цену.</div></article>
+  <div class="r-actions"><button class="btn ghost" id="rCopy">Скопировать чек</button>${from === 'story' ? '<button class="btn" id="rNext">Продолжить историю</button>' : '<button class="btn" id="rBack">К заказам</button>'}</div>`;
+  $('#rCopy').onclick = async e => { try { await navigator.clipboard.writeText(receiptText(def, cfg, ev)); e.target.textContent = 'Скопировано'; } catch (_) { const t = el('textarea'); t.value = receiptText(def, cfg, ev); t.style.cssText = 'width:100%;height:200px;margin-top:10px'; w.appendChild(t); t.select(); e.target.textContent = 'Выделено, нажмите Ctrl+C'; } };
+  if (from === 'story') $('#rNext').onclick = () => { hideSprite('all'); show('stageWrap'); S.pc = S.labels['after_' + id + '_' + ev.tier]; step(); };
+  else $('#rBack').onclick = showHub;
+}
+
+// ---------- финал ----------
+function showFinale() {
+  show('finaleScr'); const w = $('#finaleScr'); let sumP = 0, tot = 0;
+  const cards = ORDER_IDS.map(id => { const d = ORDERS[id], e = S.evals[id]; sumP += e.stars; tot += e.total;
+    return `<div class="fin"><div class="o-head"><img class="face" src="img/ch/${CH[d.client].file}_face.png" alt=""><div><div class="o-name">${esc(d.clientName)}</div><div class="o-role">${esc(d.title)}</div></div></div><div class="stars">${stars(e.stars)}</div><div class="fine">${rub(e.total)} из ${rub(d.budget)}</div><button class="btn ghost" data-r="${id}">Открыть чек</button></div>`; }).join('');
+  const avg = (sumP / 4).toFixed(1).replace('.', ',');
+  w.innerHTML = `<h2 class="h">Итоги смены</h2><p class="sub">Средняя оценка: ${avg} из 5. Общая сумма заказов: ${rub(tot)}.</p><div class="final-grid">${cards}</div><div class="r-actions"><button class="btn" id="again">Играть заново</button></div><p class="fine" style="text-align:center">Цены в игре ориентировочные. Перед реальной покупкой проверьте актуальные цены и наличие на dns-shop.ru и citilink.ru.</p>`;
+  w.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { showReceipt(b.dataset.r, 'hub2'); $('#rBack').onclick = showFinale; });
+  $('#again').onclick = () => { show('titleScr'); };
+}
+
+// ---------- ввод ----------
+document.addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !$('#stageWrap').classList.contains('hidden') && $('#choices').classList.contains('hidden') && waitClick) { e.preventDefault(); waitClick(); } });
+window.addEventListener('DOMContentLoaded', () => {
+  $('#dialog').onclick = () => { if (waitClick) waitClick(); };
+  $('#startBtn').onclick = startGame;
+  $('#ordersBtn').onclick = () => { if (Object.keys(S.done).length || S.labels.hub_ok) showHub(); };
+  $('#endShift').onclick = () => { hideSprite('all'); show('stageWrap'); S.pc = S.labels['epilogue']; step(); };
+  $('#hubStory').onclick = () => { hideSprite('all'); show('stageWrap'); };
+  showTitle();
+  Object.keys(MAN).forEach(k => { const i = new Image(); i.src = `img/ch/${k}.png`; });
+});
+
+</script>
+
+</body></html>
